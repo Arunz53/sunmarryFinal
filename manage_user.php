@@ -11,40 +11,77 @@ function generateRandomPassword() {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'add') {
-        $username = trim($_POST['username']);
-        $password = trim($_POST['password']);
-        $role = $_POST['role'];
+        $username = trim($_POST['username'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        $role = $_POST['role'] ?? '';
         $phone = trim($_POST['phone'] ?? ''); // Optional phone number
 
+        // Helper to redirect with error
+        $redirectError = function($msg) {
+            header('Location: admin_dashboard.php?error=' . urlencode($msg));
+            exit();
+        };
+
+        // Basic validation
+        if ($username === '' || $password === '') {
+            $redirectError('Username and password are required');
+        }
+        if (strlen($username) < 3) {
+            $redirectError('Username too short');
+        }
+
         // Validate role
-        if (!in_array($role, ['manager', 'support'])) {
-            die('Invalid role specified');
+        if (!in_array($role, ['manager', 'customer'])) {
+            $redirectError('Invalid role specified');
         }
 
-        // Check if username exists
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
-        $stmt->execute([$username]);
-        if ($stmt->fetchColumn() > 0) {
-            die('Username already exists');
+        try {
+            // Check if username exists
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
+            $stmt->execute([$username]);
+            if ($stmt->fetchColumn() > 0) {
+                $redirectError('Username already exists');
+            }
+
+                // Check if phone column exists and whether DB role enum contains 'customer'
+                $colStmt = $pdo->query("SHOW COLUMNS FROM users");
+                $cols = $colStmt->fetchAll(PDO::FETCH_ASSOC);
+                $colNames = array_column($cols, 'Field');
+                $hasPhoneCol = in_array('phone', $colNames);
+
+                // Determine actual DB role value to insert: some DBs may still use enum('super_admin','manager','support')
+                $roleColumn = null;
+                foreach ($cols as $c) {
+                    if ($c['Field'] === 'role') { $roleColumn = $c; break; }
+                }
+                $dbRole = $role;
+                if ($roleColumn && isset($roleColumn['Type'])) {
+                    $type = $roleColumn['Type']; // e.g. enum('super_admin','manager','support')
+                    if (strpos($type, "'customer'") === false && strpos($type, "'support'") !== false) {
+                        // DB doesn't accept 'customer' yet — map to legacy 'support' for storage
+                        if ($role === 'customer') {
+                            $dbRole = 'support';
+                        }
+                    }
+                }
+
+            // Use secure password hashing
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+
+            // Add new user - include initial credits (20) and profiles_viewed = 0
+            if ($hasPhoneCol && $phone !== '') {
+                $stmt = $pdo->prepare("INSERT INTO users (username, password, role, phone, credits, profiles_viewed) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$username, $hash, $dbRole, $phone, 20, 0]);
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO users (username, password, role, credits, profiles_viewed) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$username, $hash, $dbRole, 20, 0]);
+            }
+
+            header('Location: admin_dashboard.php?success=created');
+            exit();
+        } catch (PDOException $e) {
+            $redirectError('Database error: ' . $e->getMessage());
         }
-
-        // Check if phone column exists
-        $colStmt = $pdo->query("SHOW COLUMNS FROM users");
-        $cols = $colStmt->fetchAll(PDO::FETCH_ASSOC);
-        $colNames = array_column($cols, 'Field');
-        $hasPhoneCol = in_array('phone', $colNames);
-
-        // Add new user - conditionally include phone if column exists
-        if ($hasPhoneCol && !empty($phone)) {
-            $stmt = $pdo->prepare("INSERT INTO users (username, password, role, phone) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$username, md5($password), $role, $phone]);
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
-            $stmt->execute([$username, md5($password), $role]);
-        }
-
-        header('Location: admin_dashboard.php?success=created');
-        exit();
     }
     
     if ($_POST['action'] === 'edit') {

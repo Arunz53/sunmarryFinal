@@ -13,10 +13,10 @@ try {
     $colNames = array_column($cols, 'Field');
 
     if (!in_array('role', $colNames)) {
-        $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('super_admin', 'manager', 'support') NOT NULL DEFAULT 'support'");
+        $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('super_admin', 'manager', 'customer') NOT NULL DEFAULT 'customer'");
     }
     if (!in_array('credits', $colNames)) {
-        $pdo->exec("ALTER TABLE users ADD COLUMN credits INT DEFAULT 10");
+        $pdo->exec("ALTER TABLE users ADD COLUMN credits INT DEFAULT 20");
     }
     if (!in_array('profiles_viewed', $colNames)) {
         $pdo->exec("ALTER TABLE users ADD COLUMN profiles_viewed INT DEFAULT 0");
@@ -47,7 +47,10 @@ function requireLogin() {
 }
 
 function getUserRole() {
-    return $_SESSION['role'] ?? null;
+    $r = $_SESSION['role'] ?? null;
+    // Normalize old DB value 'support' to app-facing 'customer'
+    if ($r === 'support') return 'customer';
+    return $r;
 }
 
 function checkPermission($required_role) {
@@ -59,7 +62,7 @@ function checkPermission($required_role) {
     $role_hierarchy = [
         'super_admin' => 3,
         'manager' => 2,
-        'support' => 1
+        'customer' => 1
     ];
 
     $user_role = getUserRole();
@@ -70,50 +73,53 @@ function checkPermission($required_role) {
         exit();
     }
     
-    if ($user_role === 'support') {
-        $pdo = getDB();
-        $stmt = $pdo->prepare("SELECT credits, profiles_viewed FROM users WHERE id = ?");
-        $stmt->execute([$_SESSION['user_id']]);
-        $user = $stmt->fetch();
-        
-        if ($user['profiles_viewed'] >= 10) {
-            session_destroy();
-            header('Location: login.php?error=credits_expired');
-            exit();
-        }
-    }
-
-    // Check unique profile views for support role (limit 20)
-    if ($user_role === 'support') {
-        $pdo = getDB();
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM support_profile_views WHERE user_id = ?");
-        $stmt->execute([$_SESSION['user_id']]);
-        $uniqueViews = $stmt->fetchColumn();
-        if ($uniqueViews >= 20) {
-            session_destroy();
-            header('Location: login.php?error=credits_expired');
-            exit();
-        }
-    }
+    // Do not auto-logout customers here; charging happens on actions (view/print).
     
     return true;
 }
 
-function incrementProfileViews() {
-    if (getUserRole() === 'support') {
-        $pdo = getDB();
-        $user_id = $_SESSION['user_id'];
-        $profile_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        if ($profile_id > 0) {
-            // Only insert if not already viewed
-            $stmt = $pdo->prepare("SELECT 1 FROM support_profile_views WHERE user_id = ? AND profile_id = ?");
-            $stmt->execute([$user_id, $profile_id]);
-            if (!$stmt->fetch()) {
-                $pdo->prepare("INSERT INTO support_profile_views (user_id, profile_id) VALUES (?, ?)")->execute([$user_id, $profile_id]);
-                // Optionally update profiles_viewed for legacy UI
-                $pdo->prepare("UPDATE users SET profiles_viewed = profiles_viewed + 1 WHERE id = ?")->execute([$user_id]);
-            }
-        }
+function chargeCustomerForProfileAction(int $profile_id): bool {
+    // Returns true if action allowed (credits consumed or already consumed for this profile).
+    if (getUserRole() !== 'customer') return true;
+    $pdo = getDB();
+    $user_id = $_SESSION['user_id'] ?? null;
+    if (!$user_id || $profile_id <= 0) return true;
+
+    // If already recorded for this profile, do not charge again
+    $stmt = $pdo->prepare("SELECT 1 FROM support_profile_views WHERE user_id = ? AND profile_id = ?");
+    $stmt->execute([$user_id, $profile_id]);
+    if ($stmt->fetch()) return true;
+
+    // Check credits
+    $stmt = $pdo->prepare("SELECT credits FROM users WHERE id = ?");
+    $stmt->execute([$user_id]);
+    $credits = (int)$stmt->fetchColumn();
+    if ($credits <= 0) {
+        return false; // limit exceeded
     }
+
+    // Charge: insert view and decrement credit in a transaction
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare("INSERT INTO support_profile_views (user_id, profile_id) VALUES (?, ?)")
+            ->execute([$user_id, $profile_id]);
+        $pdo->prepare("UPDATE users SET credits = credits - 1 WHERE id = ?")
+            ->execute([$user_id]);
+        // legacy counter
+        if (in_array('profiles_viewed', array_column($pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_ASSOC), 'Field'))) {
+            $pdo->prepare("UPDATE users SET profiles_viewed = profiles_viewed + 1 WHERE id = ?")->execute([$user_id]);
+        }
+        $pdo->commit();
+        return true;
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        // On failure, allow action to proceed (do not lock user out due to DB error)
+        return true;
+    }
+}
+
+function incrementProfileViews(): bool {
+    $profile_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    return chargeCustomerForProfileAction($profile_id);
 }
 ?>

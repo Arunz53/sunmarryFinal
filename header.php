@@ -13,7 +13,7 @@ require_once 'auth.php';
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav">
-                <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'support'): ?>
+                <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'customer'): ?>
                 <li class="nav-item">
                     <a class="nav-link" href="home.php">சுயவிவரம் உருவாக்கு</a>
                 </li>
@@ -28,23 +28,24 @@ require_once 'auth.php';
                     <a class="nav-link" href="admin_dashboard.php">| Super Admin Dashboard</a>
                 </li>
                 <?php endif; ?>
-                <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'support'): ?>
+                <?php if (isset($_SESSION['role']) && $_SESSION['role'] !== 'customer'): ?>
                 <li class="nav-item">
                     <a class="nav-link" href="recycle.php"> | நீக்கம் </a>
                 </li>
                 <?php endif; ?>
             </ul>
             <ul class="navbar-nav ms-auto">
-                <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'support'): ?>
+                <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'customer'): ?>
                 <li class="nav-item">
                     <a class="nav-link" href="#">
                         <?php
                         require_once 'db.php';
                         $user_id = $_SESSION['user_id'];
-                        $stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM support_profile_views WHERE user_id = ?");
+                        $stmt = $pdo->prepare("SELECT credits FROM users WHERE id = ?");
                         $stmt->execute([$user_id]);
-                        $uniqueViews = $stmt->fetchColumn();
-                        echo "Profiles: $uniqueViews/20";
+                        $credits = $stmt->fetchColumn();
+                        $credits = $credits === null ? 20 : (int)$credits;
+                        echo "Profiles: $credits/20";
                         ?>
                     </a>
                 </li>
@@ -59,7 +60,7 @@ require_once 'auth.php';
                                 $roleDisplay = match($role) {
                                     'super_admin' => 'Super Admin',
                                     'manager' => 'Manager',
-                                    'support' => 'Support',
+                                    'customer' => 'Customer',
                                     default => 'User'
                                 };
                                 echo $roleDisplay;

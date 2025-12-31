@@ -335,15 +335,16 @@ $districtsMap = [
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2>சுயவிவரங்களை காண்</h2>
-            <?php if (getUserRole() === 'support'):
+            <?php if (getUserRole() === 'customer'):
                 $pdo = getDB();
                 $user_id = $_SESSION['user_id'];
-                $stmt = $pdo->prepare("SELECT COUNT(*) FROM support_profile_views WHERE user_id = ?");
+                $stmt = $pdo->prepare("SELECT credits FROM users WHERE id = ?");
                 $stmt->execute([$user_id]);
-                $uniqueViews = $stmt->fetchColumn();
+                $credits = $stmt->fetchColumn();
+                $credits = $credits === null ? 20 : (int)$credits;
             ?>
                 <div class="alert alert-info mb-0">
-                    பார்வையிட்ட சுயவிவரங்கள்: <strong><?php echo $uniqueViews; ?>/20</strong>
+                    Profiles remaining: <strong><?php echo $credits; ?>/20</strong>
                 </div>
             <?php endif; ?>
         </div>
@@ -543,7 +544,7 @@ $districtsMap = [
                         </div>
                     </div>
 
-                    <?php if (getUserRole() !== 'support'): ?>
+                    <?php if (getUserRole() !== 'customer'): ?>
                     <!-- Row 3: தோசம் (Dosham)/ நட்சத்திரம் (Nakshatram)/ வசிக்கும் ஊர் - Admin & Manager Only -->
                     <div class="col-md-4">
                         <label class="form-label">தோசம் (Dosham)</label>
@@ -671,7 +672,7 @@ $districtsMap = [
                 <thead>
                     <tr>
                         <th style="width:40px;">
-                            <?php if (getUserRole() !== 'support'): ?>
+                            <?php if (getUserRole() !== 'customer'): ?>
                                 <input type="checkbox" id="selectAllProfiles" title="Select all">
                             <?php endif; ?>
                         </th>
@@ -700,7 +701,7 @@ $districtsMap = [
                     <?php foreach($profiles as $profile): ?>
                     <tr>
                         <td>
-                            <?php if (getUserRole() !== 'support'): ?>
+                            <?php if (getUserRole() !== 'customer'): ?>
                                 <input type="checkbox" class="profileCheckbox" name="ids[]" value="<?php echo $profile['id']; ?>">
                             <?php endif; ?>
                         </td>
@@ -727,7 +728,7 @@ $districtsMap = [
                             <?php if (getUserRole() === 'super_admin' || getUserRole() === 'manager'): ?>
                                 <a href="edit.php?id=<?php echo $profile['id']; ?>" class="btn btn-sm btn-warning">திருத்து</a>
                             <?php endif; ?>
-                            <?php if (getUserRole() === 'super_admin' || getUserRole() === 'support'): ?>
+                            <?php if (getUserRole() === 'super_admin' || getUserRole() === 'customer'): ?>
                                 <a href="print.php?id=<?php echo $profile['id']; ?>" class="btn btn-sm btn-secondary">பிரிண்ட்</a>
                             <?php endif; ?>
                             <?php if (getUserRole() === 'super_admin'): ?>
@@ -737,7 +738,7 @@ $districtsMap = [
                                     <button type="submit" class="btn btn-sm btn-danger">அழி</button>
                                 </form>
                             <?php endif; ?>
-                            <?php if (getUserRole() === 'super_admin' || getUserRole() === 'manager' || getUserRole() === 'support'): ?>
+                            <?php if (getUserRole() === 'super_admin' || getUserRole() === 'manager' || getUserRole() === 'customer'): ?>
                                 <a href="print2.php?id=<?php echo $profile['id']; ?>" class="btn btn-sm btn-secondary">No Phone PDF</a>
                             <?php endif; ?>
                         </td>
@@ -747,7 +748,7 @@ $districtsMap = [
                 </tbody>
             </table>
                 </form>
-                <?php if (getUserRole() !== 'support'): ?>
+                <?php if (getUserRole() !== 'customer'): ?>
                     <div class="mb-3">
                         <button id="deleteSelectedBtn" class="btn btn-danger" disabled>Delete selected</button>
                     </div>

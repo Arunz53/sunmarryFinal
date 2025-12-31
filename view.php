@@ -1,11 +1,17 @@
 <?php
 require_once 'auth.php';
 
-// Minimum permission required is support
-checkPermission('support');
+// Minimum permission required is customer
+checkPermission('customer');
 
-// Increment profile views for support users
-incrementProfileViews();
+// Increment profile views for customer users (charge one credit if first time)
+$allowed = incrementProfileViews();
+if ($allowed === false) {
+    echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>Limit Exceeded</title>\n<link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\"></head><body class=\"bg-light\">";
+    echo "<div class='container mt-4'><div class='alert alert-danger'>Limit Exceeded</div><a href='profiles.php' class='btn btn-primary'>Back</a></div>";
+    echo "</body></html>";
+    exit();
+}
 
 $id = $_GET['id'] ?? null;
 if (!$id) {
@@ -269,19 +275,20 @@ $districtsMap = [
                         
                         <div class="mt-3">
                             <a href="profiles.php" class="btn btn-secondary">Back to Profiles</a>
-                            <?php if (getUserRole() !== 'support'): ?>
+                            <?php if (getUserRole() !== 'customer'): ?>
                             <a href="edit.php?id=<?php echo $profile['id']; ?>" class="btn btn-warning">Edit Profile</a>
                             <?php endif; ?>
                             <a href="print.php?id=<?php echo $profile['id']; ?>" class="btn btn-info">Print Profile</a>
-                            <?php if (getUserRole() === 'support'): ?>
+                            <?php if (getUserRole() === 'customer'): ?>
                             <div class="alert alert-info mt-3">
                                 <?php
                                 require_once 'db.php';
                                 $user_id = $_SESSION['user_id'];
-                                $stmt = $pdo->prepare("SELECT COUNT(*) FROM support_profile_views WHERE user_id = ?");
+                                $stmt = $pdo->prepare("SELECT credits FROM users WHERE id = ?");
                                 $stmt->execute([$user_id]);
-                                $uniqueViews = $stmt->fetchColumn();
-                                echo "பார்வையிட்ட சுயவிவரங்கள்: $uniqueViews/20";
+                                $credits = $stmt->fetchColumn();
+                                $credits = $credits === null ? 20 : (int)$credits;
+                                echo "Profiles remaining: $credits/20";
                                 ?>
                             </div>
                             <?php endif; ?>

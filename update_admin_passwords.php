@@ -6,7 +6,7 @@ require_once 'db.php';
 
 $admins = [
     ['admin1', 'Admin123!'],
-    ['admin2', 'Manager123!'],
+    ['admin2', 'Staff123!'],
     ['admin3', 'Support123!']
 ];
 

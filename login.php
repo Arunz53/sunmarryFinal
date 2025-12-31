@@ -9,7 +9,7 @@ try {
     $colNames = array_column($cols, 'Field');
 
     if (!in_array('role', $colNames)) {
-        $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('super_admin', 'manager', 'support') NOT NULL DEFAULT 'support'");
+        $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('super_admin', 'manager', 'customer') NOT NULL DEFAULT 'customer'");
     }
     if (!in_array('profiles_viewed', $colNames)) {
         $pdo->exec("ALTER TABLE users ADD COLUMN profiles_viewed INT DEFAULT 0");
@@ -69,13 +69,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Start session and store login info
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
-                // Some older DBs may not have `role` column; default to empty string if missing
-                $_SESSION['role'] = $user['role'] ?? '';
+                // Normalize DB role: map legacy 'support' to app-facing 'customer'
+                $dbRole = $user['role'] ?? '';
+                if ($dbRole === 'support') {
+                    $_SESSION['role'] = 'customer';
+                } else {
+                    $_SESSION['role'] = $dbRole;
+                }
 
                 // Redirect based on role: support users go directly to profiles.php
                 $redirectTo = 'home.php';
                 $role = $_SESSION['role'] ?? $user['role'] ?? '';
-                if ($role === 'support') {
+                if ($role === 'customer') {
                     $redirectTo = 'profiles.php';
                 }
                 header("Location: " . $redirectTo);

@@ -163,7 +163,7 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `email` varchar(255) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
-  `role` enum('super_admin','manager','support') NOT NULL DEFAULT 'support',
+  `role` enum('super_admin','manager','customer') NOT NULL DEFAULT 'customer',
   `profiles_viewed` int(11) DEFAULT 0,
   `last_login` datetime DEFAULT NULL,
   `credits` int(11) DEFAULT 10
@@ -176,11 +176,11 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `username`, `password`, `email`, `created_at`, `role`, `profiles_viewed`, `last_login`, `credits`) VALUES
 (1, 'admin', '$2y$10$bFtZ8krRD785m8SOJ9oIZeHSjZnU5jyOJrNgxq49V6uxEyLh1eacO', NULL, '2025-11-04 20:19:24', 'super_admin', 0, '2025-11-11 12:01:01', 10),
 (2, 'staff1', '$2y$10$G6Fre6yqQ3W8BB6ofMEtf.kXW0MYTUKtonGPskvnB2vG1hFP4CrvC', NULL, '2025-11-07 09:57:50', 'manager', 0, '2025-11-07 09:58:24', 10),
-(3, 'Guest', '$2y$10$5MrU6l9drUQ9uKsPvjNpGucliXQ5kqquhGV29vyDvC1PG/.MofKkS', NULL, '2025-11-07 10:00:13', 'support', 7, '2025-11-07 15:52:46', 10),
+(3, 'Guest', '$2y$10$5MrU6l9drUQ9uKsPvjNpGucliXQ5kqquhGV29vyDvC1PG/.MofKkS', NULL, '2025-11-07 10:00:13', 'customer', 7, '2025-11-07 15:52:46', 10),
 (4, 'staff2', '$2y$10$mjtQqtQ6ga6TvIaclC1ZxemHShaQwxI06OuCSQZynd/VcBocSrF/K', NULL, '2025-11-07 10:02:42', 'manager', 0, '2025-11-10 03:47:57', 10),
-(5, 'Guest1', '$2y$10$AABwoGrIsYuIniKP8/kKm.pQX6NDmiL/fc.PfsCd5Vx/l6MAKrEsC', NULL, '2025-11-07 11:30:37', 'support', 10, '2025-11-07 12:56:06', 10),
-(6, 'Rahul', '$2y$10$M0JZE.q4/HlrGS8bSVfAPeBCiFoYuNeu6U4Cet7zQtl.Ldg2SDMTS', NULL, '2025-11-07 16:12:17', 'support', 1, '2025-11-07 16:13:49', 10),
-(7, 'balu', '$2y$10$.ErlX0uy3YB25tSVhLh3Qe/J.z/6a/QzeTTe9pxDKWBgcaZv20yCa', NULL, '2025-11-09 16:01:14', 'support', 10, '2025-11-11 12:46:20', 10);
+(5, 'Guest1', '$2y$10$AABwoGrIsYuIniKP8/kKm.pQX6NDmiL/fc.PfsCd5Vx/l6MAKrEsC', NULL, '2025-11-07 11:30:37', 'customer', 10, '2025-11-07 12:56:06', 10),
+(6, 'Rahul', '$2y$10$M0JZE.q4/HlrGS8bSVfAPeBCiFoYuNeu6U4Cet7zQtl.Ldg2SDMTS', NULL, '2025-11-07 16:12:17', 'customer', 1, '2025-11-07 16:13:49', 10),
+(7, 'balu', '$2y$10$.ErlX0uy3YB25tSVhLh3Qe/J.z/6a/QzeTTe9pxDKWBgcaZv20yCa', NULL, '2025-11-09 16:01:14', 'customer', 10, '2025-11-11 12:46:20', 10);
 
 --
 -- Indexes for dumped tables

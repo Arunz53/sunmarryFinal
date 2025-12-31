@@ -4,7 +4,7 @@ require_once 'db.php';
 try {
     // Add role column and credits to users table
     $pdo->exec("ALTER TABLE users 
-                ADD COLUMN role ENUM('super_admin', 'manager', 'support') NOT NULL DEFAULT 'support',
+                ADD COLUMN role ENUM('super_admin', 'manager', 'customer') NOT NULL DEFAULT 'customer',
                 ADD COLUMN credits INT DEFAULT 10,
                 ADD COLUMN last_login DATETIME DEFAULT NULL,
                 ADD COLUMN profiles_viewed INT DEFAULT 0");
@@ -16,7 +16,7 @@ try {
     $admins = [
         ['admin1', 'super_admin', 'Admin123!'],
         ['admin2', 'manager', 'Manager123!'],
-        ['admin3', 'support', 'Support123!']
+        ['admin3', 'customer', 'Support123!']
     ];
 
     // Use password_hash() for secure password storage instead of md5()
