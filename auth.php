@@ -185,13 +185,15 @@ function generate_and_send_otp_for_user(int $user_id): bool {
                 $mail->SMTPSecure = defined('SMTP_SECURE') ? SMTP_SECURE : PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
                 $mail->Port = defined('SMTP_PORT') ? SMTP_PORT : 587;
             }
-            $mail->setFrom('no-reply@sunmarry.local', 'Sun Matrimony');
+            $fromEmail = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : (defined('SMTP_USER') ? SMTP_USER : 'no-reply@localhost');
+            $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Sun Matrimony';
+            $mail->setFrom($fromEmail, $fromName);
             $mail->addAddress($to);
             $mail->Subject = $subject;
             $mail->Body = $message;
             $sent = (bool)$mail->send();
         } catch (\Exception $e) {
-            $errorMsg = $e->getMessage();
+            $errorMsg = $e->getMessage() . ' | PHPMailerError: ' . $mail->ErrorInfo;
             $sent = false;
         }
     } else {
