@@ -34,6 +34,20 @@ try {
     // If we can't modify schema (no privileges or table missing), continue gracefully.
 }
 
+// Ensure OTP columns exist for Super Admin flow
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_ASSOC);
+    $colNames = array_column($cols, 'Field');
+    if (!in_array('otp_code', $colNames)) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN otp_code VARCHAR(255) DEFAULT NULL");
+    }
+    if (!in_array('otp_expires', $colNames)) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN otp_expires DATETIME DEFAULT NULL");
+    }
+} catch (PDOException $e) {
+    // ignore
+}
+
 // Authentication Functions
 function isLoggedIn() {
     return isset($_SESSION['user_id']);
@@ -121,5 +135,78 @@ function chargeCustomerForProfileAction(int $profile_id): bool {
 function incrementProfileViews(): bool {
     $profile_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     return chargeCustomerForProfileAction($profile_id);
+}
+
+// OTP helpers for Super Admin
+function generate_and_send_otp_for_user(int $user_id): bool {
+    $pdo = getDB();
+    // 6-digit OTP
+    $otp = random_int(100000, 999999);
+    $hashed = password_hash((string)$otp, PASSWORD_DEFAULT);
+    $expiresAt = (new DateTime('+5 minutes'))->format('Y-m-d H:i:s');
+
+    try {
+        $stmt = $pdo->prepare("UPDATE users SET otp_code = ?, otp_expires = ? WHERE id = ?");
+        $stmt->execute([$hashed, $expiresAt, $user_id]);
+    } catch (PDOException $e) {
+        return false;
+    }
+
+    // Attempt to send via PHPMailer if available, otherwise fallback to mail()
+    $to = 'arunasaithambiofficial@gmail.com';
+    $subject = 'Super Admin OTP - Sun Matrimony';
+    $message = "Your one-time login code is: $otp\nThis code expires in 5 minutes.";
+    $headers = "From: no-reply@localhost" . "\r\n" . "Content-Type: text/plain; charset=UTF-8";
+
+    // PHPMailer if present
+    if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+        try {
+            require_once __DIR__ . '/vendor/autoload.php';
+            $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+            // If user configures SMTP, they should define these constants in db.php or a config file
+            if (defined('SMTP_HOST') && defined('SMTP_USER') && defined('SMTP_PASS')) {
+                $mail->isSMTP();
+                $mail->Host = SMTP_HOST;
+                $mail->SMTPAuth = true;
+                $mail->Username = SMTP_USER;
+                $mail->Password = SMTP_PASS;
+                $mail->SMTPSecure = defined('SMTP_SECURE') ? SMTP_SECURE : PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->Port = defined('SMTP_PORT') ? SMTP_PORT : 587;
+            }
+            $mail->setFrom('no-reply@sunmarry.local', 'Sun Matrimony');
+            $mail->addAddress($to);
+            $mail->Subject = $subject;
+            $mail->Body = $message;
+            $mail->send();
+            return true;
+        } catch (Exception $e) {
+            // fall through to mail() fallback
+        }
+    }
+
+    // Fallback to PHP mail()
+    @mail($to, $subject, $message, $headers);
+    return true;
+}
+
+function verify_otp_for_user(int $user_id, string $otp): bool {
+    $pdo = getDB();
+    try {
+        $stmt = $pdo->prepare("SELECT otp_code, otp_expires FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || !$row['otp_code'] || !$row['otp_expires']) return false;
+        $expires = new DateTime($row['otp_expires']);
+        $now = new DateTime();
+        if ($now > $expires) return false;
+        if (!password_verify($otp, $row['otp_code'])) return false;
+
+        // Clear OTP fields
+        $clear = $pdo->prepare("UPDATE users SET otp_code = NULL, otp_expires = NULL WHERE id = ?");
+        $clear->execute([$user_id]);
+        return true;
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 ?>
