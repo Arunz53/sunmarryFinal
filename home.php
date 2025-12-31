@@ -18,8 +18,8 @@ try {
     // ignore schema change errors
 }
 
-// If the logged-in user is a 'support' role, redirect them to profiles.php only.
-if (getUserRole() === 'support') {
+// If the logged-in user is a 'customer' role, redirect them to profiles.php only.
+if (getUserRole() === 'customer') {
     header('Location: profiles.php');
     exit();
 }

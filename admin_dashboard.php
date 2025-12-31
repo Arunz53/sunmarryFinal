@@ -9,7 +9,7 @@ checkPermission('super_admin');
 $stats = [
     'total_profiles' => $pdo->query("SELECT COUNT(*) FROM profiles")->fetchColumn(),
     'total_managers' => $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'manager'")->fetchColumn(),
-    'total_support' => $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'support'")->fetchColumn(),
+    'total_customer' => $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'customer'")->fetchColumn(),
     'active_profiles' => $pdo->query("SELECT COUNT(*) FROM profiles WHERE deleted_at IS NULL")->fetchColumn()
 ];
 
@@ -144,8 +144,8 @@ if (!empty($params)) {
                     <div class="col-md-3">
                         <div class="card bg-warning text-dark">
                             <div class="card-body">
-                                <h5 class="card-title">Support Staff</h5>
-                                <h2><?php echo $stats['total_support']; ?></h2>
+                                <h5 class="card-title">Customer Staff</h5>
+                                <h2><?php echo $stats['total_customer']; ?></h2>
                             </div>
                         </div>
                     </div>
@@ -240,7 +240,7 @@ if (!empty($params)) {
                             <label for="role" class="form-label">Role</label>
                             <select class="form-control" id="role" name="role" required>
                                 <option value="manager">Manager</option>
-                                <option value="support">Support</option>
+                                <option value="customer">Customer</option>
                             </select>
                         </div>
                         <div class="mb-3">

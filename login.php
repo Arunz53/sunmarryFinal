@@ -9,7 +9,7 @@ try {
     $colNames = array_column($cols, 'Field');
 
     if (!in_array('role', $colNames)) {
-        $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('super_admin', 'manager', 'support') NOT NULL DEFAULT 'support'");
+        $pdo->exec("ALTER TABLE users ADD COLUMN role ENUM('super_admin', 'manager', 'customer') NOT NULL DEFAULT 'customer'");
     }
     if (!in_array('profiles_viewed', $colNames)) {
         $pdo->exec("ALTER TABLE users ADD COLUMN profiles_viewed INT DEFAULT 0");
@@ -62,6 +62,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($passwordOk) {
                 // Do not reset `profiles_viewed` on login — preserve the count across sessions.
 
+                // For Super Admins require OTP verification before establishing full session
+                $dbRole = $user['role'] ?? '';
+                $appRole = ($dbRole === 'support') ? 'customer' : $dbRole;
+
+                if ($appRole === 'super_admin') {
+                    // Store pending info and generate/send OTP
+                    $_SESSION['pending_otp_user_id'] = $user['id'];
+                    $_SESSION['pending_otp_username'] = $user['username'];
+                    // Generate and send OTP (function in auth.php)
+                    require_once 'auth.php';
+                    generate_and_send_otp_for_user($user['id']);
+                    header('Location: otp_verify.php');
+                    exit();
+                }
+
+                // Non-super_admin: proceed with normal login
                 // Update last login
                 $updateStmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
                 $updateStmt->execute([$user['id']]);
@@ -69,13 +85,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Start session and store login info
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
-                // Some older DBs may not have `role` column; default to empty string if missing
-                $_SESSION['role'] = $user['role'] ?? '';
+                // Normalize DB role: map legacy 'support' to app-facing 'customer'
+                if ($dbRole === 'support') {
+                    $_SESSION['role'] = 'customer';
+                } else {
+                    $_SESSION['role'] = $dbRole;
+                }
 
-                // Redirect based on role: support users go directly to profiles.php
+                // Redirect based on role
                 $redirectTo = 'home.php';
-                $role = $_SESSION['role'] ?? $user['role'] ?? '';
-                if ($role === 'support') {
+                $role = $_SESSION['role'] ?? $dbRole ?? '';
+                if ($role === 'customer') {
                     $redirectTo = 'profiles.php';
                 }
                 header("Location: " . $redirectTo);

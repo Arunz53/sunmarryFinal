@@ -12,6 +12,17 @@ define('DB_HOST', 'localhost');
 define('DB_NAME', 'u478906159_marriage');   // local DB name
 define('DB_USER', 'root');       // XAMPP default
 define('DB_PASS', '');  
+// SMTP settings: Load from smtp.php
+if (file_exists(__DIR__ . '/smtp.php')) {
+    require_once __DIR__ . '/smtp.php';
+} else {
+    // Fallback defaults if smtp.php doesn't exist
+    if (!defined('SMTP_HOST')) define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.gmail.com');
+    if (!defined('SMTP_USER')) define('SMTP_USER', getenv('SMTP_USER') ?: 'hifivewebdesign@gmail.com');
+    if (!defined('SMTP_PASS')) define('SMTP_PASS', getenv('SMTP_PASS') ?: '');
+    if (!defined('SMTP_PORT')) define('SMTP_PORT', getenv('SMTP_PORT') ?: 587);
+    if (!defined('SMTP_SECURE')) define('SMTP_SECURE', getenv('SMTP_SECURE') ?: 'tls');
+}
 
 
 

@@ -3,12 +3,21 @@ require_once 'auth.php';
 requireLogin();
 
 // Allow super_admin, manager, and support roles
-if (getUserRole() === null || (getUserRole() !== 'super_admin' && getUserRole() !== 'manager' && getUserRole() !== 'support')) {
+if (getUserRole() === null || (getUserRole() !== 'super_admin' && getUserRole() !== 'manager' && getUserRole() !== 'customer')) {
     header('Location: access_denied.php');
     exit();
 }$id = $_GET['id'] ?? null;
 if (!$id) {
     header('Location: profiles.php');
+    exit();
+}
+
+// Charge a credit for No Phone PDF if applicable
+$allowed = incrementProfileViews();
+if ($allowed === false) {
+    echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>Limit Exceeded</title>\n<link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css\" rel=\"stylesheet\"></head><body class=\"bg-light\">";
+    echo "<div class='container mt-4'><div class='alert alert-danger'>Limit Exceeded</div><a href='profiles.php' class='btn btn-primary'>Back</a></div>";
+    echo "</body></html>";
     exit();
 }
 
