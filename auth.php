@@ -152,17 +152,29 @@ function generate_and_send_otp_for_user(int $user_id): bool {
         return false;
     }
 
-    // Attempt to send via PHPMailer if available, otherwise fallback to mail()
-    $to = 'arunasaithambiofficial@gmail.com';
+    // Determine recipient: use user's email when present, otherwise fallback to admin address
+    try {
+        $emStmt = $pdo->prepare("SELECT email FROM users WHERE id = ?");
+        $emStmt->execute([$user_id]);
+        $userEmail = $emStmt->fetchColumn();
+    } catch (Exception $e) {
+        $userEmail = null;
+    }
+    $to = $userEmail ?: 'arunasaithambiofficial@gmail.com';
     $subject = 'Super Admin OTP - Sun Matrimony';
     $message = "Your one-time login code is: $otp\nThis code expires in 5 minutes.";
     $headers = "From: no-reply@localhost" . "\r\n" . "Content-Type: text/plain; charset=UTF-8";
+
+    $sent = false;
+    $method = 'none';
+    $errorMsg = '';
 
     // PHPMailer if present
     if (file_exists(__DIR__ . '/vendor/autoload.php')) {
         try {
             require_once __DIR__ . '/vendor/autoload.php';
             $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+            $method = 'phpmailer';
             // If user configures SMTP, they should define these constants in db.php or a config file
             if (defined('SMTP_HOST') && defined('SMTP_USER') && defined('SMTP_PASS')) {
                 $mail->isSMTP();
@@ -177,16 +189,36 @@ function generate_and_send_otp_for_user(int $user_id): bool {
             $mail->addAddress($to);
             $mail->Subject = $subject;
             $mail->Body = $message;
-            $mail->send();
-            return true;
-        } catch (Exception $e) {
-            // fall through to mail() fallback
+            $sent = (bool)$mail->send();
+        } catch (\Exception $e) {
+            $errorMsg = $e->getMessage();
+            $sent = false;
+        }
+    } else {
+        // Fallback to PHP mail()
+        $method = 'mail()';
+        try {
+            $sent = (bool)@mail($to, $subject, $message, $headers);
+            if (!$sent) $errorMsg = 'mail() returned false';
+        } catch (\Exception $e) {
+            $sent = false;
+            $errorMsg = $e->getMessage();
         }
     }
 
-    // Fallback to PHP mail()
-    @mail($to, $subject, $message, $headers);
-    return true;
+    // Log attempts for debugging (creates public_html/logs/otp.log)
+    try {
+        $logDir = __DIR__ . '/logs';
+        if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+        $entry = sprintf("%s | user_id=%d | to=%s | otp=%s | method=%s | sent=%s | err=%s\n",
+            (new DateTime())->format('Y-m-d H:i:s'), $user_id, $to, $otp, $method, $sent ? '1' : '0', str_replace("\n", ' ', $errorMsg)
+        );
+        @file_put_contents($logDir . '/otp.log', $entry, FILE_APPEND | LOCK_EX);
+    } catch (\Exception $e) {
+        // ignore logging errors
+    }
+
+    return $sent;
 }
 
 function verify_otp_for_user(int $user_id, string $otp): bool {

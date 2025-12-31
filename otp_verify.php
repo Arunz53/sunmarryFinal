@@ -1,7 +1,9 @@
 <?php
 require_once 'db.php';
 require_once 'auth.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $error = '';
 // Ensure there's a pending OTP
