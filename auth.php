@@ -152,7 +152,14 @@ function generate_and_send_otp_for_user(int $user_id): bool {
         return false;
     }
 
-    // Determine recipient: use user's email when present, otherwise fallback to admin address
+    // Load SMTP config if not already loaded
+    if (!defined('SMTP_USER')) {
+        if (file_exists(__DIR__ . '/smtp.php')) {
+            require_once __DIR__ . '/smtp.php';
+        }
+    }
+    
+    // Determine recipient: use user's email when present, otherwise fallback to admin/SMTP address
     try {
         $emStmt = $pdo->prepare("SELECT email FROM users WHERE id = ?");
         $emStmt->execute([$user_id]);
@@ -160,9 +167,17 @@ function generate_and_send_otp_for_user(int $user_id): bool {
     } catch (Exception $e) {
         $userEmail = null;
     }
-    $to = $userEmail ?: 'arunasaithambiofficial@gmail.com';
-    $subject = 'Super Admin OTP - Sun Matrimony';
-    $message = "Your one-time login code is: $otp\nThis code expires in 5 minutes.";
+    $to = $userEmail ?: (defined('SMTP_USER') ? SMTP_USER : 'hifivewebdesign@gmail.com');
+    $subject = 'Your OTP Code - Sunmarry';
+    $message = "===========================================\n"
+             . "SUNMARRY OTP VERIFICATION\n"
+             . "===========================================\n\n"
+             . "Your One-Time Password (OTP):\n\n"
+             . "  ➤ $otp\n\n"
+             . "⏱️  This code expires in: 5 minutes\n"
+             . "⚠️  Do not share this code with anyone\n\n"
+             . "If you did not request this code, please ignore this email.\n"
+             . "===========================================\n";
     $headers = "From: no-reply@localhost" . "\r\n" . "Content-Type: text/plain; charset=UTF-8";
 
     $sent = false;
@@ -173,10 +188,14 @@ function generate_and_send_otp_for_user(int $user_id): bool {
     if (file_exists(__DIR__ . '/vendor/autoload.php')) {
         try {
             require_once __DIR__ . '/vendor/autoload.php';
+            // Always load SMTP credentials from smtp.php before creating PHPMailer instance
+            if (file_exists(__DIR__ . '/smtp.php')) {
+                require_once __DIR__ . '/smtp.php';
+            }
             $mail = new PHPMailer\PHPMailer\PHPMailer(true);
             $method = 'phpmailer';
-            // If user configures SMTP, they should define these constants in db.php or a config file
-            if (defined('SMTP_HOST') && defined('SMTP_USER') && defined('SMTP_PASS')) {
+            // Configure SMTP if credentials are available
+            if (defined('SMTP_HOST') && defined('SMTP_USER') && defined('SMTP_PASS') && SMTP_PASS !== '') {
                 $mail->isSMTP();
                 $mail->Host = SMTP_HOST;
                 $mail->SMTPAuth = true;
@@ -184,6 +203,9 @@ function generate_and_send_otp_for_user(int $user_id): bool {
                 $mail->Password = SMTP_PASS;
                 $mail->SMTPSecure = defined('SMTP_SECURE') ? SMTP_SECURE : PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
                 $mail->Port = defined('SMTP_PORT') ? SMTP_PORT : 587;
+            } else {
+                // If SMTP not configured, report error and fail
+                throw new \Exception('SMTP credentials not configured. Please check smtp.php file.');
             }
             $fromEmail = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : (defined('SMTP_USER') ? SMTP_USER : 'no-reply@localhost');
             $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Sun Matrimony';
@@ -193,7 +215,7 @@ function generate_and_send_otp_for_user(int $user_id): bool {
             $mail->Body = $message;
             $sent = (bool)$mail->send();
         } catch (\Exception $e) {
-            $errorMsg = $e->getMessage() . ' | PHPMailerError: ' . $mail->ErrorInfo;
+            $errorMsg = $e->getMessage() . ' | PHPMailerError: ' . (isset($mail) ? $mail->ErrorInfo : 'PHPMailer not initialized');
             $sent = false;
         }
     } else {
