@@ -181,7 +181,9 @@ function generate_and_send_otp_for_user(int $user_id): bool {
              . "⚠️  Do not share this code with anyone\n\n"
              . "If you did not request this code, please ignore this email.\n"
              . "===========================================\n";
-    $headers = "From: no-reply@localhost" . "\r\n" . "Content-Type: text/plain; charset=UTF-8";
+    $fromHeader = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : (defined('SMTP_USER') ? SMTP_USER : 'no-reply@localhost');
+    $replyToHeader = defined('SMTP_USER') ? SMTP_USER : '';
+    $headers = "From: " . $fromHeader . ($replyToHeader ? "\r\nReply-To: " . $replyToHeader : '') . "\r\nContent-Type: text/plain; charset=UTF-8";
 
     $sent = false;
     $method = 'none';
@@ -206,6 +208,18 @@ function generate_and_send_otp_for_user(int $user_id): bool {
                 $mail->Password = SMTP_PASS;
                 $mail->SMTPSecure = defined('SMTP_SECURE') ? SMTP_SECURE : PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
                 $mail->Port = defined('SMTP_PORT') ? SMTP_PORT : 587;
+                // Ensure envelope sender is the authenticated SMTP user to avoid SPF/DMARC issues
+                $mail->Sender = SMTP_USER;
+                // Optional debug logging into logs/otp_debug.log when enabled in smtp.php
+                if (defined('SMTP_DEBUG') && SMTP_DEBUG) {
+                    $mail->SMTPDebug = 2;
+                    $mail->Debugoutput = function($str, $level) {
+                        $logDir = __DIR__ . '/logs';
+                        if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+                        $entry = sprintf("%s | SMTPDBG | level=%s | %s\n", (new DateTime())->format('Y-m-d H:i:s'), $level, trim($str));
+                        @file_put_contents($logDir . '/otp_debug.log', $entry, FILE_APPEND | LOCK_EX);
+                    };
+                }
             } else {
                 // If SMTP not configured, report error and fail
                 throw new \Exception('SMTP credentials not configured. Please check smtp.php file.');
@@ -213,6 +227,9 @@ function generate_and_send_otp_for_user(int $user_id): bool {
             $fromEmail = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : (defined('SMTP_USER') ? SMTP_USER : 'no-reply@localhost');
             $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Sun Matrimony';
             $mail->setFrom($fromEmail, $fromName);
+            if (!empty($fromEmail) && !empty($replyToHeader ?? '')) {
+                $mail->addReplyTo($replyToHeader);
+            }
             if ($to === '') {
                 throw new \Exception('Recipient email missing or invalid for user id ' . $user_id);
             }

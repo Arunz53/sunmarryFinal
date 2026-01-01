@@ -10,8 +10,11 @@ if (!defined('SMTP_PASS')) define('SMTP_PASS', 'ugindxmvqkwiwvpj'); // <-- App P
 if (!defined('SMTP_PORT')) define('SMTP_PORT', 587);
 if (!defined('SMTP_SECURE')) define('SMTP_SECURE', 'tls');
 
-if (!defined('SMTP_FROM_EMAIL')) define('SMTP_FROM_EMAIL', 'hifivewebdesign@gmail.com');
+// Prefer a domain-based From address for better deliverability on hosting providers
+if (!defined('SMTP_FROM_EMAIL')) define('SMTP_FROM_EMAIL', 'no-reply@sunmarry.in');
 if (!defined('SMTP_FROM_NAME')) define('SMTP_FROM_NAME', 'Sunmarry OTP');
+// Enable detailed PHPMailer SMTP debug logging when troubleshooting (false by default)
+if (!defined('SMTP_DEBUG')) define('SMTP_DEBUG', false);
 
 ?>
 
