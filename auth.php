@@ -159,7 +159,7 @@ function generate_and_send_otp_for_user(int $user_id): bool {
         }
     }
     
-    // Determine recipient: use user's email when present, otherwise fallback to admin/SMTP address
+    // Determine recipient: use user's email when present
     try {
         $emStmt = $pdo->prepare("SELECT email FROM users WHERE id = ?");
         $emStmt->execute([$user_id]);
@@ -167,7 +167,10 @@ function generate_and_send_otp_for_user(int $user_id): bool {
     } catch (Exception $e) {
         $userEmail = null;
     }
-    $to = $userEmail ?: (defined('SMTP_USER') ? SMTP_USER : 'hifivewebdesign@gmail.com');
+    // Normalize and validate fetched email
+    $userEmail = is_string($userEmail) ? trim($userEmail) : '';
+    $isValidEmail = $userEmail !== '' && filter_var($userEmail, FILTER_VALIDATE_EMAIL);
+    $to = $isValidEmail ? $userEmail : '';
     $subject = 'Your OTP Code - Sunmarry';
     $message = "===========================================\n"
              . "SUNMARRY OTP VERIFICATION\n"
@@ -210,6 +213,9 @@ function generate_and_send_otp_for_user(int $user_id): bool {
             $fromEmail = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : (defined('SMTP_USER') ? SMTP_USER : 'no-reply@localhost');
             $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Sun Matrimony';
             $mail->setFrom($fromEmail, $fromName);
+            if ($to === '') {
+                throw new \Exception('Recipient email missing or invalid for user id ' . $user_id);
+            }
             $mail->addAddress($to);
             $mail->Subject = $subject;
             $mail->Body = $message;
@@ -222,6 +228,9 @@ function generate_and_send_otp_for_user(int $user_id): bool {
         // Fallback to PHP mail()
         $method = 'mail()';
         try {
+            if ($to === '') {
+                throw new \Exception('Recipient email missing or invalid for user id ' . $user_id);
+            }
             $sent = (bool)@mail($to, $subject, $message, $headers);
             if (!$sent) $errorMsg = 'mail() returned false';
         } catch (\Exception $e) {
@@ -234,8 +243,8 @@ function generate_and_send_otp_for_user(int $user_id): bool {
     try {
         $logDir = __DIR__ . '/logs';
         if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
-        $entry = sprintf("%s | user_id=%d | to=%s | otp=%s | method=%s | sent=%s | err=%s\n",
-            (new DateTime())->format('Y-m-d H:i:s'), $user_id, $to, $otp, $method, $sent ? '1' : '0', str_replace("\n", ' ', $errorMsg)
+        $entry = sprintf("%s | user_id=%d | fetched_email=%s | to=%s | otp=%s | method=%s | sent=%s | err=%s\n",
+            (new DateTime())->format('Y-m-d H:i:s'), $user_id, ($userEmail ?: 'NULL'), ($to ?: 'NONE'), $otp, $method, $sent ? '1' : '0', str_replace("\n", ' ', $errorMsg)
         );
         @file_put_contents($logDir . '/otp.log', $entry, FILE_APPEND | LOCK_EX);
     } catch (\Exception $e) {
